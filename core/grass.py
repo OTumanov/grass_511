@@ -29,9 +29,9 @@ from better_proxy import Proxy
 class Grass(GrassWs, GrassRest, FailureCounter):
     # global_fail_counter = 0
 
-    def __init__(self, _id: int, email: str, password: str, proxy: str = None, db: AccountsDB = None):
+    def __init__(self, _id: int, email: str, password: str, proxy: str = None, db: AccountsDB = None, user_agent: str = None):
         self.proxy = Proxy.from_str(proxy).as_url if proxy else None
-        super(GrassWs, self).__init__(email=email, password=password, user_agent=UserAgent().random, proxy=self.proxy)
+        super(GrassWs, self).__init__(email=email, password=password, user_agent=user_agent or str(UserAgent(platforms=['desktop']).random), proxy=self.proxy)
         self.proxy_score: Optional[int] = None
         self.id: int = _id
 
@@ -94,12 +94,14 @@ class Grass(GrassWs, GrassRest, FailureCounter):
     async def run(self, browser_id: str, user_id: str):
         while True:
             try:
+                destination, token = await self.get_addr(browser_id, user_id)
+                #print(f"destination {destination}")
+                if not destination:
+                    raise Exception("Failed to get destination address")
+                
                 await self.connection_handler()
 
-                await self.auth_to_extension(browser_id, user_id)
-
-                if NODE_TYPE != "2x":
-                    await self.handle_http_request_action()
+                await self.action_extension(browser_id, user_id)
 
                 for i in range(10 ** 9):
                     if MIN_PROXY_SCORE and self.proxy_score is None:
@@ -107,9 +109,10 @@ class Grass(GrassWs, GrassRest, FailureCounter):
                             await self.handle_proxy_score(MIN_PROXY_SCORE, browser_id)
                         else:
                             raise ProxyScoreNotFoundException("Proxy score not found")
-
+                    #print("send ping")
+                    await asyncio.sleep(random.randint(119, 120))
                     await self.send_ping()
-                    await self.send_pong()
+                    #await self.send_pong()
 
                     if SHOW_LOGS_RARELY:
                         if not (i % 10):
@@ -124,22 +127,12 @@ class Grass(GrassWs, GrassRest, FailureCounter):
                         points = await self.get_points_handler()
                         await self.db.update_or_create_point_stat(self.id, self.email, points)
                         logger.info(f"{self.id} | Total points: {points}")
-                    # if not (i % 1000):
-                    #     total_points = await self.db.get_total_points()
-                    #     logger.info(f"Total points in database: {total_points or 0}")
                     if i:
                         self.fail_reset()
 
-                    await asyncio.sleep(random.randint(119, 120))
+                    #await asyncio.sleep(random.randint(119, 120))
             except (WebsocketClosedException, ConnectionResetError, TypeError) as e:
                 logger.info(f"{self.id} | {type(e).__name__}: {e}. Reconnecting...")
-            # except ConnectionResetError as e:
-            #     logger.info(f"{self.id} | Connection reset: {e}. Reconnecting...")
-            # except TypeError as e:
-            #     logger.info(f"{self.id} | Type error: {e}. Reconnecting...")
-                # await self.delay_with_log(msg=f"{self.id} | Reconnecting with delay for some minutes...", sleep_time=60)
-            # except Exception as e:
-            #     logger.info(f"{self.id} | {traceback.format_exc()}")
             await self.failure_handler(limit=3)
 
             await asyncio.sleep(5, 10)
@@ -156,15 +149,12 @@ class Grass(GrassWs, GrassRest, FailureCounter):
            raise_error(WebsocketConnectionFailedError(f"{retry_state.outcome.exception()}")),
            wait=wait_random(7, 10),
            reraise=True)
+    
     async def connection_handler(self):
         logger.info(f"{self.id} | Connecting...")
         await self.connect()
         logger.info(f"{self.id} | Connected")
 
-    # @retry(stop=stop_after_attempt(3),
-    #        retry=retry_if_not_exception_type(LowProxyScoreException),
-    #        before_sleep=lambda retry_state, **kwargs: logger.info(f"{retry_state.outcome.exception()}"),
-    #        wait=wait_random(1, 3))
     async def handle_proxy_score(self, min_score: int, browser_id: str):
         for _ in range(3):
             await asyncio.sleep(25, 30)
