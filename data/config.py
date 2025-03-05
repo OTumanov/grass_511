@@ -1,7 +1,7 @@
 THREADS = 5  # for claim rewards mode / approve email mode
 MIN_PROXY_SCORE = 50  # Put MIN_PROXY_SCORE = 0 not to check proxy score (if site is down)
 
-NODE_TYPE = "1x"  # 1x, 1_25x, 2x
+NODE_TYPE = "1_25x"  # 1x, 1_25x, 2x
 
 #########################################
 CLAIM_REWARDS_ONLY = False  # claim tiers rewards only (https://app.getgrass.io/dashboard/referral-program)
