@@ -125,9 +125,6 @@ class GrassWs:
         data = received_message.get("data", {})
         url = data.get("url", "")
 
-        #print(f"connection_id: {message_id}")
-        #print(f"action: {action}")
-        #print(f"data: {data}")
 
         if action == "HTTP_REQUEST":
             result = await self.perform_http_request(data)
@@ -137,10 +134,14 @@ class GrassWs:
                 "origin_action": action,
                 "result": result
             }
-            
-            #print(f"[WEBSOCKET] Sent response: {json.dumps(response, indent=2)}")
-        await self.send_message(json.dumps(response))
 
+            await self.send_message(json.dumps(response))
+        elif action == "PONG":
+            response = {
+                "id": message_id,
+                "origin_action": action
+            }
+            await self.send_message(json.dumps(response))
 
     async def perform_http_request(self, params: dict) -> dict:
         headers = params.get("headers", {})

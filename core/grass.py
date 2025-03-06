@@ -109,10 +109,9 @@ class Grass(GrassWs, GrassRest, FailureCounter):
                             await self.handle_proxy_score(MIN_PROXY_SCORE, browser_id)
                         else:
                             raise ProxyScoreNotFoundException("Proxy score not found")
-                    #print("send ping")
-                    await asyncio.sleep(random.randint(119, 120))
+
                     await self.send_ping()
-                    #await self.send_pong()
+                    await self.action_extension(browser_id, user_id)
 
                     if SHOW_LOGS_RARELY:
                         if not (i % 10):
@@ -130,7 +129,7 @@ class Grass(GrassWs, GrassRest, FailureCounter):
                     if i:
                         self.fail_reset()
 
-                    #await asyncio.sleep(random.randint(119, 120))
+                    await asyncio.sleep(random.randint(119, 120))
             except (WebsocketClosedException, ConnectionResetError, TypeError) as e:
                 logger.info(f"{self.id} | {type(e).__name__}: {e}. Reconnecting...")
             await self.failure_handler(limit=3)
