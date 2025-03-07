@@ -31,5 +31,7 @@ To hang several connections on 1 account, you just need to duplicate it in the a
 
 2. Proxy Setup 🔒
 
-   Configure your proxies with the *ANY* (socks, http/s, ...) format in `data/proxies.txt` 🌐
+   Configure your proxies in `data/proxies.txt` 🌐
+   `http://login:pass@ip:port
+   socks5://login:pass@ip:port`
 
