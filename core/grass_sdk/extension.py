@@ -81,7 +81,7 @@ class GrassWs:
             raise Exception(f"Error getting connection info: {e}")
 
     async def connect(self):
-        uri = f"wss://{self.destination}:80/?token={self.token}"
+        uri = f"wss://{self.destination}/?token={self.token}"
 
         random_bytes = os.urandom(16)
         sec_websocket_key = base64.b64encode(random_bytes).decode('utf-8')
