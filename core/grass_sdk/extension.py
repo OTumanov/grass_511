@@ -68,8 +68,6 @@ class GrassWs:
                 self.destination = data.get('destinations')[0] if data.get('destinations') else None
                 self.token = data.get('token')
                 return self.destination, self.token
-            else:
-                raise Exception(f"Failed to get connection info: {response.status_code}")
 
         except requests.exceptions.ProxyError as e:
             if "connection to proxy closed" in str(e):
