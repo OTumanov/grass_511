@@ -23,6 +23,8 @@ from data.config import ACCOUNTS_FILE_PATH, PROXIES_FILE_PATH, THREADS, \
     SHOW_LOGS_RARELY, NODE_TYPE
 
 
+ua = UserAgent(platforms=['desktop'])
+
 def bot_info(name: str = ""):
     cprint(text2art(name), 'green')
 
@@ -47,8 +49,6 @@ async def worker_task(_id, account: str, proxy: str = None, db: AccountsDB = Non
     grass = None
 
     try:
-
-        ua = UserAgent(platforms=['desktop'])
         user_agent = str(ua.random)
         
         grass = Grass(
