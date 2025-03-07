@@ -69,6 +69,9 @@ class GrassWs:
                 self.token = data.get('token')
                 return self.destination, self.token
 
+
+        except requests.exceptions.SSLError as e:
+            raise ProxyError(f"SSL error with proxy: {e}")
         except requests.exceptions.ProxyError as e:
             if "connection to proxy closed" in str(e):
                 raise ProxyError("Proxy connection closed")
