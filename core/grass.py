@@ -29,9 +29,12 @@ from better_proxy import Proxy
 class Grass(GrassWs, GrassRest, FailureCounter):
     # global_fail_counter = 0
 
-    def __init__(self, _id: int, email: str, password: str, proxy: str = None, db: AccountsDB = None, user_agent: str = None):
+    def __init__(self, _id: int, email: str, password: str, proxy: str = None, db: AccountsDB = None,
+                 user_agent: str = None):
         self.proxy = Proxy.from_str(proxy).as_url if proxy else None
-        super(GrassWs, self).__init__(email=email, password=password, user_agent=user_agent or str(UserAgent(platforms=['desktop']).random), proxy=self.proxy)
+        super(GrassWs, self).__init__(email=email, password=password,
+                                      user_agent=user_agent or str(UserAgent(platforms=['desktop']).random),
+                                      proxy=self.proxy)
         self.proxy_score: Optional[int] = None
         self.id: int = _id
 
@@ -66,8 +69,12 @@ class Grass(GrassWs, GrassRest, FailureCounter):
             except (ProxyBlockedException, ProxyForbiddenException) as e:
                 # self.proxies.remove(self.proxy)
                 msg = "Proxy forbidden"
-            except ProxyError:
-                msg = "Low proxy score"
+            except ProxyError as e:
+                if "connection to proxy closed" in str(e):
+                    # Удаляем прокси из списка, так как он не работает
+                    msg = "Proxy connection closed, switching to next proxy"
+                else:
+                    msg = "Low proxy score"
             except WebsocketConnectionFailedError:
                 msg = "Websocket connection failed"
                 self.reach_fail_limit()
@@ -95,10 +102,10 @@ class Grass(GrassWs, GrassRest, FailureCounter):
         while True:
             try:
                 destination, token = await self.get_addr(browser_id, user_id)
-                #print(f"destination {destination}")
+                # print(f"destination {destination}")
                 if not destination:
                     raise Exception("Failed to get destination address")
-                
+
                 await self.connection_handler()
 
                 await self.action_extension(browser_id, user_id)
@@ -109,6 +116,7 @@ class Grass(GrassWs, GrassRest, FailureCounter):
                             await self.handle_proxy_score(MIN_PROXY_SCORE, browser_id)
                         else:
                             raise ProxyScoreNotFoundException("Proxy score not found")
+                    # print("send ping")
 
                     await self.send_ping()
                     await self.action_extension(browser_id, user_id)
@@ -148,7 +156,6 @@ class Grass(GrassWs, GrassRest, FailureCounter):
            raise_error(WebsocketConnectionFailedError(f"{retry_state.outcome.exception()}")),
            wait=wait_random(7, 10),
            reraise=True)
-    
     async def connection_handler(self):
         logger.info(f"{self.id} | Connecting...")
         await self.connect()
@@ -166,10 +173,10 @@ class Grass(GrassWs, GrassRest, FailureCounter):
                 logger.success(f"{self.id} | Proxy score: {self.proxy_score}")
                 return True
             else:
-                raise LowProxyScoreException(f"{self.id} | Too low proxy score: {proxy_score} for {self.proxy}. Retrying...")
+                raise LowProxyScoreException(
+                    f"{self.id} | Too low proxy score: {proxy_score} for {self.proxy}. Retrying...")
 
         logger.info(f"{self.id} | Proxy score not found for {self.proxy}. Waiting for score...")
-
 
     async def change_proxy(self):
         self.proxy = await self.get_new_proxy()

@@ -9,7 +9,7 @@ import uuid
 
 from better_proxy import Proxy
 
-from core.utils.exception import WebsocketClosedException, ProxyForbiddenException
+from core.utils.exception import WebsocketClosedException, ProxyForbiddenException, ProxyError
 
 import os, base64
 
@@ -25,6 +25,7 @@ class GrassWs:
         self.session = None
         self.websocket = None
         self.id = None
+        self.last_live_timestamp = time.time()
         # self.ws_session = None
 
     async def get_addr(self, browser_id: str, user_id: str):
@@ -60,20 +61,27 @@ class GrassWs:
                 verify=False,
                 timeout=30
             )
-            
+
             if response.status_code == 201:
                 data = response.json()
+
                 self.destination = data.get('destinations')[0] if data.get('destinations') else None
                 self.token = data.get('token')
                 return self.destination, self.token
             else:
                 raise Exception(f"Failed to get connection info: {response.status_code}")
-                
+
+        except requests.exceptions.ProxyError as e:
+            if "connection to proxy closed" in str(e):
+                raise ProxyError("Proxy connection closed")
+            raise ProxyError(f"Proxy error: {e}")
         except Exception as e:
+            if "connection to proxy closed" in str(e):
+                raise ProxyError("Proxy connection closed")
             raise Exception(f"Error getting connection info: {e}")
 
     async def connect(self):
-        uri = f"ws://{self.destination}:80/?token={self.token}"
+        uri = f"wss://{self.destination}:80/?token={self.token}"
 
         random_bytes = os.urandom(16)
         sec_websocket_key = base64.b64encode(random_bytes).decode('utf-8')
@@ -94,24 +102,30 @@ class GrassWs:
             'Sec-WebSocket-Extensions': 'permessage-deflate; client_max_window_bits',
             'Accept': ''  # Устанавливаем пустое значение
         }
+        if not self.session:
+            print("No session available for WebSocket connection")
+            raise Exception("Session not initialized")
+
         try:
-            self.websocket = await self.session.ws_connect(uri, headers=headers, proxy=self.proxy)
+            self.websocket = await self.session.ws_connect(
+                uri,
+                headers=headers,
+                proxy=self.proxy,
+                ssl=True if uri.startswith('wss://') else False  # Включаем SSL для wss://
+            )
+
         except Exception as e:
             if 'status' in dir(e) and e.status == 403:
                 raise ProxyForbiddenException(f"Low proxy score. Can't connect. Error: {e}")
             raise e
 
     async def send_message(self, message):
-        # logger.info(f"Sending: {message}")
         await self.websocket.send_str(message)
 
     async def receive_message(self):
         msg = await self.websocket.receive()
-        # logger.info(f"Received: {msg}")
-
         if msg.type == WSMsgType.CLOSED:
             raise WebsocketClosedException(f"Websocket closed: {msg}")
-
         return json.loads(msg.data)
 
     async def get_connection_id(self):

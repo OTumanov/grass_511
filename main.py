@@ -30,12 +30,14 @@ def bot_info(name: str = ""):
         ctypes.windll.kernel32.SetConsoleTitleW(f"{name}")
 
     print(
+        f"{colored('Public script / Not for sale', color='light_red')}\n"
+        f"{colored('Паблик скрипт / Не для продажи', color='light_red')}\n"
         f"{colored('sourse EnJoYeR mod by TellBip', color='light_yellow')} "
         f"{colored('https://t.me/+b0BPbs7V1aE2NDFi', color='light_green')}"
     )
 
 
-async def worker_task(_id, account: str, proxy: str = None, wallet: str = None, db: AccountsDB = None):
+async def worker_task(_id, account: str, proxy: str = None, db: AccountsDB = None):
     try:
         email, password = account.split(":")[:2]
     except ValueError:
@@ -43,13 +45,9 @@ async def worker_task(_id, account: str, proxy: str = None, wallet: str = None, 
         return False
 
     grass = None
-    local_db = None
 
     try:
-        # Создаем локальную копию базы данных для каждого воркера
-        local_db = AccountsDB(PROXY_DB_PATH)
-        await local_db.connect()
-        
+
         ua = UserAgent(platforms=['desktop'])
         user_agent = str(ua.random)
         
@@ -58,7 +56,7 @@ async def worker_task(_id, account: str, proxy: str = None, wallet: str = None, 
             email=email,
             password=password,
             proxy=proxy,
-            db=local_db,
+            db=db,
             user_agent=user_agent
         )
 
@@ -84,8 +82,6 @@ async def worker_task(_id, account: str, proxy: str = None, wallet: str = None, 
     finally:
         if grass:
             await grass.session.close()
-        if local_db:
-            await local_db.close_connection()
 
 
 async def main():

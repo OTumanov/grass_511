@@ -74,7 +74,7 @@ class GrassRest(BaseClient):
 
         response = await self.session.get(url, headers=self.website_headers, proxy=self.proxy)
 
-        logger.debug(f"{self.id} | Get Points response: {await response.text()}")
+        #logger.debug(f"{self.id} | Get Points response: {await response.text()}")
 
         res_json = await response.json()
         points = res_json.get('data', {}).get('epochEarnings', [{}])[0].get('totalCumulativePoints')
@@ -117,16 +117,22 @@ class GrassRest(BaseClient):
         except ContentTypeError as e:
             logger.info(f"{self.id} | Login response: Could not parse response as JSON. '{e}'")
 
-        resp_text = await response.text()
+        #resp_text = await response.text()
 
+        if response.status == 429:
+            # Обработка ограничения частоты запросов
+            retry_after = response.headers.get("Retry-After")
+            retry_after = int(retry_after) if retry_after and retry_after.isdigit() else 5  # 5 секунд по умолчанию
+            logger.warning(f"{self.id} | Detected Cloudflare Rate limited. Retrying after {retry_after} seconds...")
+            await asyncio.sleep(retry_after)
         # Check if the response is HTML
-        if "doctype html" in resp_text.lower():
-            raise CloudFlareHtmlException(f"{self.id} | Detected Cloudflare HTML response: {resp_text}")
+        #if "doctype html" in resp_text.lower():
+        #    raise CloudFlareHtmlException(f"{self.id} | Detected Cloudflare HTML response: {resp_text}")
 
         if response.status == 403:
-            raise ProxyBlockedException(f"Login response: {resp_text}")
+            raise ProxyBlockedException(f"Login response: {response.status}")
         if response.status != 200:
-            raise ClientConnectionError(f"Login response: | {resp_text}")
+            raise ClientConnectionError(f"Login response: | {response.status}")
 
         return await response.json()
 
