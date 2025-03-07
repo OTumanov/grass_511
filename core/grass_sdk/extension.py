@@ -80,7 +80,7 @@ class GrassWs:
         except Exception as e:
             if "connection to proxy closed" in str(e):
                 raise ProxyError("Proxy connection closed")
-            raise Exception(f"Error getting connection info: {e}")
+            raise ProxyError(f"Error getting connection info: {e}")
 
     async def connect(self):
         uri = f"wss://{self.destination}/?token={self.token}"
@@ -104,9 +104,6 @@ class GrassWs:
             'Sec-WebSocket-Extensions': 'permessage-deflate; client_max_window_bits',
             'Accept': ''  # Устанавливаем пустое значение
         }
-        if not self.session:
-            print("No session available for WebSocket connection")
-            raise Exception("Session not initialized")
 
         try:
             self.websocket = await self.session.ws_connect(
