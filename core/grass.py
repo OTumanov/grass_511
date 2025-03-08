@@ -101,10 +101,15 @@ class Grass(GrassWs, GrassRest, FailureCounter):
     async def run(self, browser_id: str, user_id: str):
         while True:
             try:
-                destination, token = await self.get_addr(browser_id, user_id)
-                # print(f"destination {destination}")
-                if not destination:
-                    raise Exception("Failed to get destination address")
+                # Получаем адрес и токен
+                try:
+                    destination, token = await self.get_addr(browser_id, user_id)
+                    if not destination:
+                        logger.error(f"{self.id} | Failed to get destination address")
+                        raise ProxyError("Failed to get destination address")
+                except Exception as e:
+                    logger.error(f"{self.id} | Error getting address: {e}")
+                    raise ProxyError(f"Error getting address: {e}")
 
                 await self.connection_handler()
 
@@ -116,7 +121,6 @@ class Grass(GrassWs, GrassRest, FailureCounter):
                             await self.handle_proxy_score(MIN_PROXY_SCORE, browser_id)
                         else:
                             raise ProxyScoreNotFoundException("Proxy score not found")
-                    # print("send ping")
 
                     await self.send_ping()
                     await self.action_extension(browser_id, user_id)

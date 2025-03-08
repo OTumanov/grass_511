@@ -64,20 +64,35 @@ class GrassWs:
             )
 
             if response.status_code == 201:
-                data = response.json()
+                try:
+                    data = response.json()
+                    self.destination = data.get('destinations')[0] if data.get('destinations') else None
+                    self.token = data.get('token')
 
-                self.destination = data.get('destinations')[0] if data.get('destinations') else None
-                self.token = data.get('token')
-                return self.destination, self.token
+                    # Проверяем, что получили все необходимые данные
+                    if not self.destination or not self.token:
+                        #print(f"Incomplete data received: destination={self.destination}, token={self.token}")
+                        raise ProxyError(f"Incomplete data from server: {data}")
 
+                    return self.destination, self.token
+                except (ValueError, json.JSONDecodeError) as e:
+                    #print(f"JSON decode error: {e}, response: {response.text}")
+                    raise ProxyError(f"JSON decode error: {e}")
+            else:
+                #print(f"Failed to get connection info: {response.status_code}, response: {response.text}")
+                raise ProxyError(f"Failed to get connection info: {response.status_code}")
 
         except requests.exceptions.SSLError as e:
+            #print(f"SSL error with proxy: {e}")
             raise ProxyError(f"SSL error with proxy: {e}")
         except requests.exceptions.ProxyError as e:
             if "connection to proxy closed" in str(e):
+                #print(f"Proxy connection closed: {e}")
                 raise ProxyError("Proxy connection closed")
+            #print(f"Proxy error: {e}")
             raise ProxyError(f"Proxy error: {e}")
         except Exception as e:
+            #print(f"Error getting connection info: {type(e).__name__}: {e}")
             if "connection to proxy closed" in str(e):
                 raise ProxyError("Proxy connection closed")
             raise ProxyError(f"Error getting connection info: {e}")
