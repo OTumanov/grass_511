@@ -14,7 +14,7 @@ from core.utils.exception import WebsocketClosedException, ProxyForbiddenExcepti
 
 import os, base64
 
-from data.config import NODE_TYPE
+from data.config import NODE_TYPE, USE_WSS
 
 
 class GrassWs:
@@ -83,7 +83,8 @@ class GrassWs:
             raise ProxyError(f"Error getting connection info: {e}")
 
     async def connect(self):
-        uri = f"ws://{self.destination}/?token={self.token}"
+        protocol = "wss" if USE_WSS else "ws"
+        uri = f"{protocol}://{self.destination}/?token={self.token}"
 
         random_bytes = os.urandom(16)
         sec_websocket_key = base64.b64encode(random_bytes).decode('utf-8')
@@ -102,7 +103,7 @@ class GrassWs:
             'Accept-Language': 'en-US,en;q=0.9',
             'Sec-WebSocket-Key': sec_websocket_key,
             'Sec-WebSocket-Extensions': 'permessage-deflate; client_max_window_bits',
-            'Accept': ''  # Устанавливаем пустое значение
+            'Accept': ''
         }
 
         try:
@@ -110,7 +111,7 @@ class GrassWs:
                 uri,
                 headers=headers,
                 proxy=self.proxy,
-                ssl=True if uri.startswith('wss://') else False  # Включаем SSL для wss://
+                ssl=USE_WSS  # Используем SSL только для WSS
             )
 
         except Exception as e:

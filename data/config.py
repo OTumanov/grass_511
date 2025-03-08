@@ -3,6 +3,9 @@ MIN_PROXY_SCORE = 50  # Put MIN_PROXY_SCORE = 0 not to check proxy score (if sit
 
 NODE_TYPE = "1_25x"  # 1x, 1_25x, 2x
 
+# WebSocket configuration
+USE_WSS = False  # True для WSS (защищенное соединение), False для WS
+
 #########################################
 CLAIM_REWARDS_ONLY = False  # claim tiers rewards only (https://app.getgrass.io/dashboard/referral-program)
 
