@@ -22,8 +22,8 @@ from data.config import ACCOUNTS_FILE_PATH, PROXIES_FILE_PATH, THREADS, \
     PROXY_DB_PATH, MIN_PROXY_SCORE, CHECK_POINTS, STOP_ACCOUNTS_WHEN_SITE_IS_DOWN, \
     SHOW_LOGS_RARELY, NODE_TYPE
 
-
 ua = UserAgent(platforms=['desktop'])
+
 
 def bot_info(name: str = ""):
     cprint(text2art(name), 'green')
@@ -33,9 +33,7 @@ def bot_info(name: str = ""):
 
     print(
         f"{colored('Public script / Not for sale', color='light_red')}\n"
-        f"{colored('Паблик скрипт / Не для продажи', color='light_red')}\n"
-        f"{colored('sourse EnJoYeR mod by TellBip', color='light_yellow')} "
-        f"{colored('https://t.me/+b0BPbs7V1aE2NDFi', color='light_green')}"
+        f"{colored('source EnJoYeR', color='light_yellow')} "
     )
 
 
@@ -50,7 +48,7 @@ async def worker_task(_id, account: str, proxy: str = None, db: AccountsDB = Non
 
     try:
         user_agent = str(ua.random)
-        
+
         grass = Grass(
             _id=_id,
             email=email,

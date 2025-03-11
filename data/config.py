@@ -21,3 +21,7 @@ MINING_MODE = True
 ACCOUNTS_FILE_PATH = 'data/accounts.txt'
 PROXIES_FILE_PATH = 'data/proxies.txt'
 PROXY_DB_PATH = 'data/proxies_stats.db'
+
+#######################################
+# Очистка базы данных с плохими прокси
+CLEAR_BAD_PROXIES_INTERVAL = 0  # 0 - # чищать только при первом запуске, >0 - интервал в минутах для периодической очистки
