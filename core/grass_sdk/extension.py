@@ -4,7 +4,6 @@ import time
 from base64 import b64decode, b64encode
 from random import choice
 import aiohttp
-from curl_cffi import requests
 from aiohttp import WSMsgType
 import uuid
 
@@ -26,83 +25,78 @@ class GrassWs:
         self.session = None
         self.websocket = None
         self.id = None
-        self.last_live_timestamp = time.time()
+        self.last_live_timestamp = time.time()  # Для отслеживания "живости"
         # self.ws_session = None
 
     async def get_addr(self, browser_id: str, user_id: str):
-        
         message = {
             "browserId": browser_id,
-	        "userId": user_id,
-	        "version": "5.1.1",
-	        "extensionId": "lkbnfiajjmbhnfledhphioinpickokdi",
-	        "userAgent": self.user_agent,
-	        "deviceType": "extension"
-                }
+            "userId": user_id,
+            "version": "5.1.1",
+            "extensionId": "lkbnfiajjmbhnfledhphioinpickokdi",
+            "userAgent": self.user_agent,
+            "deviceType": "extension"
+        }
 
         headers = {
-                'User-Agent': self.user_agent,
-                'Accept': '*/*',
-                'Origin': 'chrome-extension://lkbnfiajjmbhnfledhphioinpickokdi',
-                'Content-Type': 'application/json',
-                'Sec-Fetch-Site': 'none',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Storage-Access': 'active',
-                'Accept-Encoding': 'gzip, deflate, br, zstd',
-                'Accept-Language': 'en-US;q=0.8,en;q=0.7',
+            'Connection': 'keep-alive',
+            'User-Agent': self.user_agent,
+            'Content-Type': 'application/json',
+            'Accept': '*/*',
+            'Origin': 'chrome-extension://lkbnfiajjmbhnfledhphioinpickokdi',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Storage-Access': 'active',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Accept-Language': 'en-US;q=0.8,en;q=0.7',
         }
+
         try:
-            response = requests.post(
+            response = await self.session.post(
                 'https://director.getgrass.io/checkin',
                 json=message,
                 headers=headers,
-                proxies={'http': self.proxy, 'https': self.proxy} if self.proxy else None,
-                impersonate="chrome" ,
-                verify=False,
-                timeout=30
+                proxy=self.proxy,
+                ssl=False
             )
 
-            if response.status_code == 201:
+            text = await response.text()
+
+            if response.status == 201:
                 try:
-                    data = response.json()
+                    try:
+                        data = json.loads(text)
+                    except json.JSONDecodeError as e:
+                        print(f"Received non-JSON response: {text}")
+                        raise ProxyError(f"Received non-JSON response: {text}")
+
                     self.destination = data.get('destinations')[0] if data.get('destinations') else None
                     self.token = data.get('token')
 
-                    # Проверяем, что получили все необходимые данные
-                    if not self.destination or not self.token:
-                        #print(f"Incomplete data received: destination={self.destination}, token={self.token}")
-                        raise ProxyError(f"Incomplete data from server: {data}")
+                    if not self.destination:
+                        raise ProxyError("No destination received")
 
                     return self.destination, self.token
-                except (ValueError, json.JSONDecodeError) as e:
-                    #print(f"JSON decode error: {e}, response: {response.text}")
-                    raise ProxyError(f"JSON decode error: {e}")
+                except Exception as e:
+                    print(f"Error processing response: {e}, response: {text}")
+                    raise ProxyError(f"Error processing response: {e}")
             else:
-                #print(f"Failed to get connection info: {response.status_code}, response: {response.text}")
-                raise ProxyError(f"Failed to get connection info: {response.status_code}")
+                print(f"Failed to get connection info: {response.status}, response: {text}")
+                raise ProxyError(f"Failed to get connection info: {response.status}")
 
-        except requests.exceptions.SSLError as e:
-            #print(f"SSL error with proxy: {e}")
-            raise ProxyError(f"SSL error with proxy: {e}")
-        except requests.exceptions.ProxyError as e:
-            if "connection to proxy closed" in str(e):
-                #print(f"Proxy connection closed: {e}")
-                raise ProxyError("Proxy connection closed")
-            #print(f"Proxy error: {e}")
-            raise ProxyError(f"Proxy error: {e}")
         except Exception as e:
-            #print(f"Error getting connection info: {type(e).__name__}: {e}")
-            if "connection to proxy closed" in str(e):
-                raise ProxyError("Proxy connection closed")
-            raise ProxyError(f"Error getting connection info: {e}")
+            print(f"Error getting connection info: {type(e).__name__}: {e}")
+            raise ProxyError(f"Error getting connection info: {type(e).__name__}: {e}")
 
     async def connect(self):
+
         protocol = "wss" if USE_WSS else "ws"
         uri = f"{protocol}://{self.destination}/?token={self.token}"
 
         random_bytes = os.urandom(16)
         sec_websocket_key = base64.b64encode(random_bytes).decode('utf-8')
+        # Извлекаем хост из destination
 
         # Точный набор заголовков как в Charles
         headers = {
@@ -118,7 +112,7 @@ class GrassWs:
             'Accept-Language': 'en-US,en;q=0.9',
             'Sec-WebSocket-Key': sec_websocket_key,
             'Sec-WebSocket-Extensions': 'permessage-deflate; client_max_window_bits',
-            'Accept': ''
+            'Accept': ''  # Устанавливаем пустое значение
         }
 
         try:
@@ -141,6 +135,7 @@ class GrassWs:
         msg = await self.websocket.receive()
         if msg.type == WSMsgType.CLOSED:
             raise WebsocketClosedException(f"Websocket closed: {msg}")
+        self.last_live_timestamp = time.time()  # Обновляем при любом сообщении
         return json.loads(msg.data)
 
     async def get_connection_id(self):
@@ -154,6 +149,9 @@ class GrassWs:
         data = received_message.get("data", {})
         url = data.get("url", "")
 
+        # print(f"connection_id: {message_id}")
+        # print(f"action: {action}")
+        # print(f"data: {data}")
 
         if action == "HTTP_REQUEST":
             result = await self.perform_http_request(data)
@@ -163,14 +161,17 @@ class GrassWs:
                 "origin_action": action,
                 "result": result
             }
-
-            await self.send_message(json.dumps(response))
+            response_str = json.dumps(response, separators=(',', ':'))  # Удаляем лишние пробелы
+            # print(f"[WEBSOCKET] Sent response: {json.dumps(response, indent=2)}")
+            await self.send_message(response_str)
         elif action == "PONG":
             response = {
                 "id": message_id,
                 "origin_action": action
             }
-            await self.send_message(json.dumps(response))
+            response_str = json.dumps(response, separators=(',', ':'))  # Удаляем лишние пробелы
+            # print(f"[WEBSOCKET] Received PONG, sending response: {json.dumps(response, indent=2)}")
+            await self.send_message(response_str)
 
     async def perform_http_request(self, params: dict) -> dict:
         headers = params.get("headers", {})
@@ -179,31 +180,30 @@ class GrassWs:
         body = params.get("body")
 
         try:
-            response = requests.request(
-                method=method,
-                url=url,
-                headers=headers,
-                data=body,
-                proxies={'http': self.proxy, 'https': self.proxy} if self.proxy else None,
-                impersonate="chrome",
-                verify=False,
-                timeout=30
-            )
-            
-            # Извлечение заголовков
-            headers_dict = dict(response.headers)
-            
-            # Получаем тело ответа и кодируем в base64
-            body_bytes = response.content
-            body_base64 = b64encode(body_bytes).decode('utf-8')
+            async with self.session.request(
+                    method=method,
+                    url=url,
+                    headers=headers,
+                    data=body,
+                    proxy=self.proxy,
+                    ssl=False
+            ) as response:
+                # Получаем статус и заголовки
+                status = response.status
+                status_text = response.reason
+                headers_dict = dict(response.headers)
 
-            return {
-                "url": str(response.url),
-                "status": response.status_code,
-                "status_text": response.reason,
-                "headers": headers_dict,
-                "body": body_base64
-            }
+                # Получаем тело ответа и кодируем в base64
+                body_bytes = await response.read()
+                body_base64 = b64encode(body_bytes).decode('utf-8')
+
+                return {
+                    "url": str(response.url),
+                    "status": status,
+                    "status_text": status_text,
+                    "headers": headers_dict,
+                    "body": body_base64
+                }
         except Exception as e:
             print(f"Error occurred while performing fetch: {e}")
             return {
@@ -212,11 +212,16 @@ class GrassWs:
                 "status_text": "Bad Request",
                 "headers": {},
                 "body": ""
-            }    
+            }
 
     async def send_ping(self):
-        message = json.dumps(
-            {"id": str(uuid.uuid4()), "version": "1.0.0", "action": "PING", "data": {}}
-        )
+        message = {
+            "id": str(uuid.uuid4()),
+            "version": "1.0.0",
+            "action": "PING",
+            "data": {}
+        }
+        message_str = json.dumps(message, separators=(',', ':'))  # Удаляем лишние пробелы
+        # print(f"[WEBSOCKET] Sent PING at {time.strftime('%H:%M:%S')}")
+        await self.send_message(message_str)
 
-        await self.send_message(message)

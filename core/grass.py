@@ -121,6 +121,7 @@ class Grass(GrassWs, GrassRest, FailureCounter):
                             await self.handle_proxy_score(MIN_PROXY_SCORE, browser_id)
                         else:
                             raise ProxyScoreNotFoundException("Proxy score not found")
+                    # print("send ping")
 
                     await self.send_ping()
                     await self.action_extension(browser_id, user_id)
